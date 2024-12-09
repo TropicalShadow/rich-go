@@ -2,12 +2,14 @@ package ipc
 
 import (
 	"fmt"
+	"gopkg.in/natefinch/npipe.v2"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // getIpcPath returns the IPC path depending on the operating system.
@@ -33,7 +35,7 @@ func getIpcPath(pipe string) string {
 		paths = []string{".", "snap.discord", "app/com.discordapp.Discord", "app/com.discordapp.DiscordCanary"}
 
 	case "windows":
-		tempdir = `\\?\pipe`
+		tempdir = `\\.\pipe`
 		paths = []string{"."}
 	default:
 		return ""
@@ -47,7 +49,7 @@ func getIpcPath(pipe string) string {
 				continue
 			}
 			for _, entry := range entries {
-				if strings.HasPrefix(entry.Name(), ipcPrefix) && testIpcPath(entry.Name()) {
+				if strings.HasPrefix(entry.Name(), ipcPrefix) && testIpcPath(filepath.Join(fullPath, entry.Name())) {
 					return filepath.Join(fullPath, entry.Name())
 				}
 			}
@@ -60,7 +62,7 @@ func getIpcPath(pipe string) string {
 func testIpcPath(path string) bool {
 	switch runtime.GOOS {
 	case "windows":
-		_, err := os.OpenFile(path, os.O_RDONLY, 0)
+		_, err := npipe.DialTimeout(path, time.Second*2)
 		return err == nil
 
 	default:
