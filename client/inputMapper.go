@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/hugolgst/rich-go/ipc"
 	"time"
 )
 
@@ -64,11 +65,51 @@ type Secrets struct {
 	Spectate string
 }
 
-func mapActivity(activity *Activity) *PayloadActivity {
-	final := &PayloadActivity{
+func fromPayload(payload *ipc.ResponseActivity) *Activity {
+	final := &Activity{
+		Details:    payload.Details,
+		State:      payload.State,
+		LargeImage: payload.Assets.LargeImage,
+		LargeText:  payload.Assets.LargeText,
+		SmallImage: payload.Assets.SmallImage,
+		SmallText:  payload.Assets.SmallText,
+	}
+
+	if payload.Timestamps != nil && payload.Timestamps.Start != nil {
+		start := time.Unix(0, int64(*payload.Timestamps.Start)*1e6)
+		final.Timestamps = &Timestamps{
+			Start: &start,
+		}
+		if payload.Timestamps.End != nil {
+			end := time.Unix(0, int64(*payload.Timestamps.End)*1e6)
+			final.Timestamps.End = &end
+		}
+	}
+
+	if payload.Party != nil {
+		final.Party = &Party{
+			ID:         payload.Party.ID,
+			Players:    payload.Party.Size[0],
+			MaxPlayers: payload.Party.Size[1],
+		}
+	}
+
+	if payload.Secrets != nil {
+		final.Secrets = &Secrets{
+			Join:     payload.Secrets.Join,
+			Match:    payload.Secrets.Match,
+			Spectate: payload.Secrets.Spectate,
+		}
+	}
+
+	return final
+}
+
+func (activity *Activity) toPayload() *ipc.PayloadActivity {
+	final := &ipc.PayloadActivity{
 		Details: activity.Details,
 		State:   activity.State,
-		Assets: PayloadAssets{
+		Assets: ipc.PayloadAssets{
 			LargeImage: activity.LargeImage,
 			LargeText:  activity.LargeText,
 			SmallImage: activity.SmallImage,
@@ -78,7 +119,7 @@ func mapActivity(activity *Activity) *PayloadActivity {
 
 	if activity.Timestamps != nil && activity.Timestamps.Start != nil {
 		start := uint64(activity.Timestamps.Start.UnixNano() / 1e6)
-		final.Timestamps = &PayloadTimestamps{
+		final.Timestamps = &ipc.PayloadTimestamps{
 			Start: &start,
 		}
 		if activity.Timestamps.End != nil {
@@ -88,14 +129,14 @@ func mapActivity(activity *Activity) *PayloadActivity {
 	}
 
 	if activity.Party != nil {
-		final.Party = &PayloadParty{
+		final.Party = &ipc.PayloadParty{
 			ID:   activity.Party.ID,
 			Size: [2]int{activity.Party.Players, activity.Party.MaxPlayers},
 		}
 	}
 
 	if activity.Secrets != nil {
-		final.Secrets = &PayloadSecrets{
+		final.Secrets = &ipc.PayloadSecrets{
 			Join:     activity.Secrets.Join,
 			Match:    activity.Secrets.Match,
 			Spectate: activity.Secrets.Spectate,
@@ -104,7 +145,7 @@ func mapActivity(activity *Activity) *PayloadActivity {
 
 	if len(activity.Buttons) > 0 {
 		for _, btn := range activity.Buttons {
-			final.Buttons = append(final.Buttons, &PayloadButton{
+			final.Buttons = append(final.Buttons, &ipc.PayloadButton{
 				Label: btn.Label,
 				Url:   btn.Url,
 			})

@@ -8,13 +8,17 @@ import (
 )
 
 func main() {
-	err := client.Login("DISCORD_APP_ID")
+	rpcClient := client.NewClient()
+
+	err := rpcClient.Login("DISCORD_APP_ID")
 	if err != nil {
 		panic(err)
 	}
 
+	fmt.Println("Logged in as", rpcClient.User().Username)
+
 	now := time.Now()
-	err = client.SetActivity(client.Activity{
+	_, err = rpcClient.SetActivity(client.Activity{
 		State:      "Heyy!!!",
 		Details:    "I'm running on rich-go :)",
 		LargeImage: "largeimageid",
@@ -30,7 +34,7 @@ func main() {
 			Start: &now,
 		},
 		Buttons: []*client.Button{
-			&client.Button{
+			{
 				Label: "GitHub",
 				Url:   "https://github.com/hugolgst/rich-go",
 			},

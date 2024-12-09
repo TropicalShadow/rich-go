@@ -3,79 +3,110 @@ package ipc
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
-	"os"
 )
 
-var socket net.Conn
-
-// Choose the right directory to the ipc socket and return it
-func GetIpcPath() string {
-	variablesnames := []string{"XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"}
-
-	if _, err := os.Stat("/run/user/1000/snap.discord"); err == nil {
-		return "/run/user/1000/snap.discord"
-	}
-
-	if _, err := os.Stat("/run/user/1000/.flatpak/com.discordapp.Discord/xdg-run"); err == nil {
-		return "/run/user/1000/.flatpak/com.discordapp.Discord/xdg-run"
-	}
-
-	for _, variablename := range variablesnames {
-		path, exists := os.LookupEnv(variablename)
-
-		if exists {
-			return path
-		}
-	}
-
-	return "/tmp"
-}
+var Socket net.Conn
 
 func CloseSocket() error {
-	if socket != nil {
-		socket.Close()
-		socket = nil
+	if Socket != nil {
+		_ = Socket.Close()
+		Socket = nil
 	}
 	return nil
 }
 
-// Read the socket response
-func Read() string {
-	buf := make([]byte, 512)
-	payloadlength, err := socket.Read(buf)
+func parseBaseResponse(rawResponse []byte) (*BaseResponse, error) {
+	var baseResp BaseResponse
+	err := json.Unmarshal(rawResponse, &baseResp)
 	if err != nil {
-		//fmt.Println("Nothing to read")
+		fmt.Println(string(rawResponse))
+		return nil, fmt.Errorf("failed to parse base response: %w", err)
 	}
-
-	buffer := new(bytes.Buffer)
-	for i := 8; i < payloadlength; i++ {
-		buffer.WriteByte(buf[i])
-	}
-
-	return buffer.String()
+	return &baseResp, nil
 }
 
-// Send opcode and payload to the unix socket
-func Send(opcode int, payload string) string {
+func ParseResponseData[T any](rawResponse []byte) (*T, error) {
+	baseResp, err := parseBaseResponse(rawResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	var result T
+
+	switch baseResp.CMD {
+	case "DISPATCH":
+		var handshakeData HandShakeDataResponse
+		if err := json.Unmarshal(baseResp.Data, &handshakeData); err != nil {
+			return nil, fmt.Errorf("failed to parse handshake data: %w", err)
+		}
+		result = any(handshakeData).(T)
+	case "SET_ACTIVITY":
+		var activityData ResponseActivity
+		if err := json.Unmarshal(baseResp.Data, &activityData); err != nil {
+			return nil, fmt.Errorf("failed to parse activity data: %w", err)
+		}
+		result = any(activityData).(T)
+	case "ERROR":
+		var errorData ErrorDataResponse
+		if err := json.Unmarshal(baseResp.Data, &errorData); err != nil {
+			return nil, fmt.Errorf("failed to parse error data: %w", err)
+		}
+		result = any(errorData).(T)
+	default:
+		result = any(baseResp.Data).(T)
+	}
+
+	return &result, nil
+}
+
+func Read() []byte {
+	var buffer bytes.Buffer
+	buf := make([]byte, 1024) // Consider making this dynamic? SET_ACTIVITY can return a wide range of sizes
+
+	for {
+		payloadLength, err := Socket.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil
+		}
+
+		if payloadLength > 8 {
+			buffer.Write(buf[8:payloadLength])
+		}
+
+		if payloadLength < len(buf) {
+			break
+		}
+	}
+
+	return buffer.Bytes()
+}
+
+// Send opcode and payload to the unix Socket
+func Send(opcode int, payload string) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	err := binary.Write(buf, binary.LittleEndian, int32(opcode))
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	err = binary.Write(buf, binary.LittleEndian, int32(len(payload)))
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	buf.Write([]byte(payload))
-	_, err = socket.Write(buf.Bytes())
+	_, err = Socket.Write(buf.Bytes())
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
-	return Read()
+	return Read(), nil
 }
