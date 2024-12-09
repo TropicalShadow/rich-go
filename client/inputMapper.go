@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/hugolgst/rich-go/ipc"
+	"github.com/tropicalshadow/rich-go/ipc"
 	"time"
 )
 

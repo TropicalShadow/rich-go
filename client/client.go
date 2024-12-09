@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hugolgst/rich-go/ipc"
+	"github.com/tropicalshadow/rich-go/ipc"
 	"os"
 	"strings"
 )

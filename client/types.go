@@ -1,6 +1,6 @@
 package client
 
-import "github.com/hugolgst/rich-go/ipc"
+import "github.com/tropicalshadow/rich-go/ipc"
 
 type Handshake struct {
 	V        string `json:"v"`
