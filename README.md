@@ -19,7 +19,8 @@ import "github.com/hugolgst/rich-go/client"
 
 then login by sending the first handshake
 ```golang
-err := client.Login("DISCORD_APP_ID")
+rpcClient := client.NewClient()
+err := rpcClient.Login("DISCORD_APP_ID")
 if err != nil {
 	panic(err)
 }
@@ -27,7 +28,7 @@ if err != nil {
 
 and you can set the Rich Presence activity (parameters can be found :
 ```golang
-err = client.SetActivity(client.Activity{
+err = rpcClient.SetActivity(client.Activity{
 	State:      "Heyy!!!",
 	Details:    "I'm running on rich-go :)",
 	LargeImage: "largeimageid",
